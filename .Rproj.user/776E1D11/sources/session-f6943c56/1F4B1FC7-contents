@@ -1,0 +1,79 @@
+library(ggplot2)
+library(dplyr)
+library(reshape2)
+library(stringr)
+require(gridExtra)
+
+setwd('E:\\Organized_Stuff\\Work_Files\\MSI\\RB_and_DJP\\Singapore_data_Brian\\tables_and_figures\\asv\\pcoa')
+
+
+# ===== Load and parse table =====
+
+ord_table <- read.csv('ordination.csv')
+
+ord_table_w_mdata <- ord_table %>%
+  mutate(
+    Substrate = word(sample.id, 2, sep='_'),
+    Time_orig = word(sample.id, 3, sep='_'),
+    Time = as.numeric(substr(word(sample.id, -1, sep='_'), 1, nchar(word(sample.id, -1, sep='_')) - 1))
+  ) %>%
+  mutate(Time = ifelse(Time == 7, Time * 24, Time))
+
+ord_table_substr <- ord_table_w_mdata %>%
+  filter(Substrate != 'water')
+
+
+# ===== lm of PC2 vs timepoint =====
+
+pc2_v_time_lm <- lm(PC2 ~ Time, data=ord_table_substr)
+summary(pc2_v_time_lm)
+
+slope <- signif(pc2_v_time_lm$coefficients[2], 2)
+intcpt <- signif(pc2_v_time_lm$coefficients[1], 2)
+
+
+# ===== Plot PC2 vs Time =====
+
+pc2_v_time_plot <- ggplot(ord_table_substr, aes(x=Time, y=PC2)) +
+  geom_point(aes(color=Time_orig, shape=Substrate), size=3, alpha=0.5) +
+  geom_smooth(fill=NA, method='lm') +
+  annotate('text', x=105, y=0, label='y = -0.0040x + 0.22') +
+  annotate('text', x=105, y=-0.05, label='p < 0.001') +
+  theme_bw() +
+  xlab('Timepoint (Hours)') +
+  ylab('PC2') +
+  labs(color='Timepoint') +
+  theme(
+    axis.title.y = element_text(margin=margin(r=15), face='bold'),
+    axis.title.x = element_text(margin=margin(t=15), face='bold'),
+    plot.margin = margin(t=5, b=5, l=10, r=10),
+    legend.position = 'none'
+  ) +
+  guides(
+    color = guide_legend(order = 1),
+    shape  = guide_legend(order = 0)
+  )
+
+pc2_v_time_plot
+
+
+# ===== Plot PCoA =====
+
+pcoa_plot <- ggplot(ord_table_w_mdata, aes(x=PC1, y=PC2, color=Time_orig, shape=Substrate)) +
+  geom_point(size=3, fill=NA, alpha=0.5) +
+  theme_bw() +
+  xlab('PC1 (30.77% variance)') +
+  ylab('PC2 (15.92% variance)') +
+  labs(color='Timepoint') +
+  theme(
+    axis.title.y = element_text(margin=margin(r=15), face='bold'),
+    axis.title.x = element_text(margin=margin(t=15), face='bold'),
+    plot.margin = margin(t=5, b=5, l=5, r=10)
+  )
+
+pcoa_plot
+
+
+# ===== Plot Together =====
+
+grid.arrange(pcoa_plot, pc2_v_time_plot, td_plot, ncol=3)

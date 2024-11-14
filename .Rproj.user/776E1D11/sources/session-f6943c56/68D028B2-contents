@@ -1,0 +1,482 @@
+---
+title: "Diversity Analyses in R"
+author: "MOLab"
+date: "2024-11-14"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 2
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+knitr::knit_hooks$set(
+   error = function(x, options) {
+     paste('\n\n<div class="alert alert-danger">',
+           gsub('##', '\n', gsub('^##\ Error', '**Error**', x)),
+           '</div>', sep = '\n')
+   },
+   warning = function(x, options) {
+     paste('\n\n<div class="alert alert-warning">',
+           gsub('##', '\n', gsub('^##\ Warning:', '**Warning**', x)),
+           '</div>', sep = '\n')
+   },
+   message = function(x, options) {
+     paste('\n\n<div class="alert alert-info">',
+           gsub('##', '\n', x),
+           '</div>', sep = '\n')
+   }
+)
+```
+
+---
+
+# Load Libraries
+
+```{r warning=F, message=F}
+library(vegan)
+library(qiime2R)
+library(dendextend)
+library(cluster)
+library(dplyr)
+library(corrplot)
+library(ggpubr)
+library(Hmisc)
+library(phyloseq)
+library(ggplot2)
+library(plotly)
+```
+
+---
+
+# Load Data
+
+## `phyloseq` Demo Data
+
+### Feature Table
+
+For demonstration purposes, we will be using a dataset available in the `phyloseq` package. This table consists of 19,216 features (OTUs) in rows and 26 samples in columns. Note that this table is not yet rarefied, so we will demonstrate below how to rarefy a feature table in R.
+
+```{r GlobalPatterns}
+data("GlobalPatterns")
+feature_table <- as.data.frame(otu_table(GlobalPatterns))
+```
+
+```{r}
+str(feature_table)
+```
+
+### Metadata
+
+Additionally, we will also make use of the metadata file associated with the samples.
+
+```{r}
+metadata <- as(sample_data(GlobalPatterns), 'data.frame')
+names(metadata)[1] <- 'Samples'  # Convert column name from X.SampleID to Samples
+```
+
+```{r}
+str(metadata)
+```
+
+## Loading Your Own Data
+
+<details>
+<summary>Click to expand</summary>
+<br>
+
+If you want to use your own data, some ways to load your feature tables as dataframe in R are outlined below.
+
+<div class="alert alert-info"><b>Note:</b> Preferably, you should set the working directory first to where your relevant files are located. To do that, you can go to "Session > Set Working Directory > Choose Directory ..." or better yet, you can use the <code>setwd()</code> function.</div>
+
+### QIIME Artifact
+
+You can directly load your table from a `.qza` file (type `FeatureData[Frequency]`) to an R dataframe using the package `qiime2R`.
+
+```{r eval=F}
+feature_table <- read_qza('feature-table.qza')
+```
+
+### TSV
+
+Alternatively, if you have a tab-separated file, you can use the `read.table` function. We assume here that your `feature-table.tsv` file has (1) sample names in row 1, and (2) has feature IDs in column 1. If not, you can format your table in Excel or alter the code below.
+
+```{r eval=F}
+feature_table <- read.table('feature-table.tsv', sep='\t', header=T, row.names=1)
+```
+
+---
+
+# Rarefaction
+
+<div class="alert alert-info"><b>Note:</b> Skip this section if you have imported a rarefied table.</div>
+
+Rarefaction is simply a process of randomly subsampling the data. In this context, we randomly select _N_ reads from each sample so that each sample would end up having equal sampling depth. The reason for this is that different samples often have varying sequencing depths, which can introduce bias when comparing diversity metrics across samples. By rarefying to a uniform depth, we mitigate the impact of sequencing depth variability, allowing for a more accurate comparison of diversity metrics between samples.
+
+<div class="alert alert-info"><strong>Note:</strong> In the code below, we rarefy the samples at the smallest sampling depth - this is for demonstration purpose only. A more informed way to select rarefaction depth is by visualizing rarefaction curves. More details about this is mentioned in <code>Diversity Analysis in QIIME2.ipynb</code>.</div>
+
+```{r warning=F}
+rare_ft <- as.data.frame(rrarefy(t(feature_table), sample=min(colSums(feature_table))))
+```
+
+# Diversity Indices
+
+Many functions related to ecological statistics are available in the package `vegan`. In the sub-sections below, we will demonstrate how to calculate various diversity indices.
+
+## Alpha Diversity
+
+### Calculation of Alpha Diversity Indices
+
+Some alpha diversity indices can be calculated using the `diversity()` function. By default, `diversity()` uses the `shannon` index, but you could change this by adding the parameter `index`. Meanwhile, diversity indices that attempts to extrapolate species richness (e.g. `chao1`, `ACE`) can be obtained using the `estimateR()` function.
+
+**Shannon Index**
+
+```{r}
+shannon <- diversity(rare_ft)
+```
+
+**Simpson Index**
+
+```{r}
+simpson <- diversity(rare_ft, index='simpson')
+```
+
+**Chao1**
+
+```{r}
+chao1 <- estimateR(rare_ft)['S.chao1', ]
+```
+
+### Visualization of Alpha Diversity Indices
+
+Below, we visually compare the `shannon` diversity index of samples across the metadata variable `SampleType`.
+
+First, we create a single dataframe containing sample names (`Samples`), sample groups (`SampleType`), and the diversity index (`shannon`)
+
+```{r}
+sample_groups <- metadata %>% select(X.SampleID, SampleType)
+
+alpha_div_df <- as.data.frame(shannon) %>% tibble::rownames_to_column('Samples')
+```
+
+```{r}
+sample_group_div <- merge(sample_groups, alpha_div_df, by='Samples')
+str(sample_group_div)
+```
+
+Now, we create boxplots to visualize the distribution of `shannon` diversity across the sample groups.
+
+```{r}
+ggplot(sample_group_div, aes(x=shannon, y=SampleType, fill=SampleType)) +
+  geom_boxplot() +
+  geom_jitter(height=0.2, size=0.5) +
+  theme_bw() +
+  xlab('Shannon Diversity') +
+  ylab('Sample Type')
+```
+
+### Alpha diversity significance testing
+
+```{r}
+kruskal.test()
+```
+
+
+
+## Beta Diversity
+
+### Calculation of Beta Diversity Indices
+
+Beta diversity indices can be calculated using the `vegdist()` function. This generates a dissimilarity index, and by default uses the Bray-Curtis index (`bray`).
+
+**Bray-Curtis**
+
+```{r}
+bray <- vegdist(rare_ft)
+```
+
+**Euclidean**
+
+```{r}
+eucl <- vegdist(rare_ft, method='euclidean')
+```
+
+**Jaccard**
+
+<div class="alert alert-info"><b>Note:</b> If you will be using indices that measure presence/absence only (e.g. Jaccard), you have to indicate <code>binary=T</code>.</div>
+
+```{r}
+jacc <- vegdist(rare_ft, method='jaccard', binary=T)
+```
+
+### Principal Coordinate Analysis (PCoA)
+
+Principal coordinate analysis (PCoA) is a multivariate analysis technique that begins with a distance matrix, typically derived from a beta diversity index. It then projects samples into a lower-dimensional space (commonly 2 or 3 dimensions) to facilitate visualization of potential clusters within the dataset.
+
+Below, we use the Bray-Curtis dissimilarity matrix for demonstration.
+
+```{r}
+pcoa <- cmdscale(bray, eig=T)
+```
+
+A simple visualization can be created using the `ordiplot()` function.
+
+```{r}
+ordiplot(pcoa, display='sites', type='text')
+```
+
+We can make this prettier by using `ggplot()`. First, we collect the coordinates of the points.
+
+```{r}
+pcoa_points <- as.data.frame(pcoa$points) %>% tibble::rownames_to_column('Samples')
+```
+
+Then, we merge this with the metadata table.
+
+```{r}
+pcoa_w_metadata <- merge(metadata, pcoa_points, by='Samples')
+pcoa_w_metadata
+```
+
+We also calculate the variance explained by the first two principal components (PC).
+
+```{r}
+var_PCs <- pcoa$eig / sum(pcoa$eig)
+var_PC1 <- var_PCs[1]
+var_PC2 <- var_PCs[2]
+```
+
+Now, we recreate the plot above, but instead of sample names as points, we color the points according to `SampleType`.
+
+```{r}
+pcoa_plot <- ggplot(pcoa_w_metadata, aes(x=V1, y=V2, color=SampleType)) +
+  geom_point() +
+  theme_bw() +
+  xlab(paste0('PC1 (', round(var_PC1*100, 2), '%)')) +
+  ylab(paste0('PC2 (', round(var_PC2*100, 2), '%)'))
+
+ggplotly(pcoa_plot)
+```
+
+### Hierarchical Clustering
+
+Hierarchical clustering is a method that builds a tree-like structure (dendrogram) based on pairwise distances between samples. It starts by treating each sample as its own cluster, then iteratively merges the closest clusters until all samples are joined into one. This approach can reveal nested groupings within the data and highlight relationships across multiple levels of similarity.
+
+#### Finding "Best" Method
+
+There are different agglomeration methods in hierarchical clustering. Hence, we first try different methods and find what approach represents will the originally calculated distances (we use `bray` again).
+
+Below, we will compare the following methods: `single`, `complete`, `average`, `ward`.
+
+```{r}
+par(mfrow = c(2,2))
+
+# Single linkage
+otu.bc.sing <- hclust(bray, method = "single")
+dend <- as.dendrogram(otu.bc.sing)
+dend %>% set("labels_cex", 0.8) %>%
+  plot(cex = 0.8,
+       cex.axis = 0.8,
+       cex.lab = 0.9,
+       horiz = FALSE)
+title(main = "Single linkage", line = 0.5)
+
+# Complete linkage
+otu.bc.comp <- hclust(bray, method = "complete")
+dend <- as.dendrogram(otu.bc.comp)
+dend %>% set("labels_cex", 0.8) %>%
+  plot(cex = 0.8,
+       cex.axis = 0.8,
+       cex.lab = 0.9,
+       horiz = FALSE)
+title(main = "Complete linkage", line = 0.5)
+
+# UPGMA
+otu.bc.upgma <- hclust(bray, method = "average")
+dend <- as.dendrogram(otu.bc.upgma)
+dend %>% set("labels_cex", 0.8) %>%
+  plot(cex = 0.8,
+       cex.axis = 0.8,
+       cex.lab = 0.9,
+       horiz = FALSE)
+title(main = "UPGMA", line = 0.5)
+
+# Ward
+otu.bc.ward <- hclust(bray, method = "ward.D2")
+dend <- as.dendrogram(otu.bc.ward)
+dend %>% set("labels_cex", 0.8) %>%
+  plot(cex = 0.8,
+       cex.axis = 0.8,
+       cex.lab = 0.9,
+       horiz = FALSE)
+title(main = "Ward", line = 0.5)
+```
+
+We look at the cophenetic correlation to find which approach retains most of the information contained in the dissimilarity matrix. Based on the metrics below, we see that `average` linkage (UPGMA) yields the highest correlation coefficient.
+
+```{r}
+# Single linkage clustering
+otu.bc.sing.coph <- cophenetic(otu.bc.sing)
+paste0('Single linkage correlation = ', cor(bray, otu.bc.sing.coph))
+# Complete linkage clustering
+otu.bc.comp.coph <- cophenetic(otu.bc.comp)
+paste0('Complete linkage correlation = ', cor(bray, otu.bc.comp.coph))
+# Average clustering
+otu.bc.upgma.coph <- cophenetic(otu.bc.upgma)
+paste0('Average linkage correlation = ', cor(bray, otu.bc.upgma.coph))
+# Ward clustering
+otu.bc.ward.coph <- cophenetic(otu.bc.ward)
+paste0('Ward Correlation = ', cor(bray, otu.bc.ward.coph))
+```
+
+We can also visualize these into Shepard-like diagrams. The plots below essentially give the same results as the metrics calculated above.
+
+```{r}
+par(mfrow = c(2,2))
+plot(
+  bray,
+  otu.bc.sing.coph,
+  xlab = "Bray-Curtis dissimilarity",
+  ylab = "Cophenetic distance",
+  asp = 1,
+  xlim = c(0, 1),
+  ylim = c(0, 1),
+  main = c("Single linkage", 
+    paste("Cophenetic correlation =", round(cor(bray,
+      otu.bc.sing.coph), 3)))
+)
+abline(0, 1)
+lines(lowess(bray, otu.bc.sing.coph), 
+      col = "red")
+
+plot(
+  bray,
+  otu.bc.comp.coph,
+  xlab = "Bray-Curtis dissimilarity",
+  ylab = "Cophenetic distance",
+  asp = 1,
+  xlim = c(0, 1),
+  ylim = c(0, 1),
+  main = c("Complete linkage", 
+    paste("Cophenetic correlation =",
+      round(cor(bray, otu.bc.comp.coph), 3)))
+)
+abline(0, 1)
+lines(lowess(bray, otu.bc.comp.coph), 
+      col = "red")
+
+plot(
+  bray,
+  otu.bc.upgma.coph,
+  xlab = "Bray-Curtis dissimilarity",
+  ylab = "Cophenetic distance",
+  asp = 1,
+  xlim = c(0, 1),
+  ylim = c(0, 1),
+  main = c("UPGMA", 
+    paste("Cophenetic correlation =",
+      round(cor(bray, otu.bc.upgma.coph), 3)))
+)
+abline(0, 1)
+lines(lowess(bray, otu.bc.upgma.coph), 
+      col = "red")
+
+plot(
+  bray,
+  otu.bc.ward.coph,
+  xlab = "Bray-Curtis dissimilarity",
+  ylab = "Cophenetic distance",
+  asp = 1,
+  xlim = c(0, 1),
+  ylim = c(0, 1),
+  main = c("Ward", 
+    paste("Cophenetic correlation =",
+      round(cor(bray, otu.bc.ward.coph), 3)))
+)
+abline(0, 1)
+lines(lowess(bray, otu.bc.ward.coph), 
+      col = "red")
+```
+
+Finally, Gower distances also provide another measurable quantity that describes how well cophenetic distances match with the original distance matrix.
+
+```{r}
+(gow.dist.single <- sum((bray - otu.bc.sing.coph) ^ 2))
+(gow.dist.comp <- sum((bray - otu.bc.comp.coph) ^ 2))
+(gow.dist.UPGMA <- sum((bray - otu.bc.upgma.coph) ^ 2))
+(gow.dist.ward <- sum((bray - otu.bc.ward.coph) ^ 2))
+```
+
+Based on the results above, it seems that UPGMA (or `average` linkage clustering) best represents the distance matrix used. Let's plot it again for reference.
+
+```{r}
+dend %>% set("labels_cex", 0.8) %>%
+  plot(cex = 0.8,
+       cex.axis = 0.8,
+       cex.lab = 0.9,
+       horiz = FALSE)
+title(main = "UPGMA", line = 0.5)
+```
+
+#### Optimal Number of Clusters
+
+A dendrogram's interpretation largely depends on the number of clusters you define. As such, it is crucial that the number of clusters you select results in samples that are cohesive with samples of its own cluster, and at the same time well-separated with samples from other clusters. This is what **silhouette widths** attempt to measure.
+
+First, we select the "best" dendrogram generated above (UPGMA).
+
+```{r}
+hc <- otu.bc.upgma
+```
+
+For each possible number of clusters, we calculate the silhoutte width value.
+
+```{r}
+Si <- numeric(nrow(rare_ft))
+
+for (k in 2:(nrow(rare_ft) - 1)) {
+  sil <- silhouette(cutree(hc, k = k), bray)
+  Si[k] <- summary(sil)$avg.width
+}
+
+k.best <- which.max(Si)
+```
+
+Finally, we plot silhouette widths versus cluster number.
+
+```{r}
+plot(
+  1:nrow(rare_ft),
+  Si,
+  type = "h",
+  main = "Silhouette-optimal number of clusters",
+  xlab = "k (number of clusters)",
+  ylab = "Average silhouette width"
+)
+axis(
+  1,
+  k.best,
+  paste("optimum", k.best, sep = "\n"),
+  col = "red",
+  font = 2,
+  col.axis = "red"
+)
+points(k.best,
+       max(Si),
+       pch = 16,
+       col = "red",
+       cex = 1.5)
+```
+
+We see that 8 is the optimal value, thus, we "cut" the tree at a height such that we get 8 distinct clusters. In this demo data, samples primarily clustered according to `SampleType` except for samples coming from skin/palm and tongue which clustered together.
+
+```{r}
+dend %>% set("labels_cex", 0.8) %>%
+  plot(cex = 0.8,
+       cex.axis = 0.8,
+       cex.lab = 0.9,
+       horiz = FALSE)
+title(main = "UPGMA", line = 0.5)
+abline(a=1.1, b=0, col='red')
+```
