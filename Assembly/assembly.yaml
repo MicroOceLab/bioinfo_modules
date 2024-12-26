@@ -1,0 +1,9 @@
+name: assembly-env
+channels:
+  - defaults
+  - conda-forge
+  - bioconda
+dependencies:
+  - spades
+  - megahit
+  - quast
