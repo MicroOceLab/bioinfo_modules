@@ -8,3 +8,7 @@ This repository serves as a comprehensive resource for bioinformatics pipelines,
 * **Reusability**: Modules are designed to be mixed and matched, providing flexibility to users who may want to integrate selected sections into their existing workflows.
 * **Interactive Code** (mostly): Most modules are written in Jupyter and RMarkdown, allowing users to directly run code blocks, explore outputs, and make adjustments based on their data.
 * **Report Generation**: Easily generate reproducible reports using Jupyter notebooks and RMarkdown, facilitating the presentation of methods, code, and results. This feature streamlines project documentation and provides clear outputs that are easily shared with collaborators.
+
+## Pipeline
+
+An interactive visualization of pipelines built from these modules can be accessed [here](https://bioinformatics-pipeline-viz.onrender.com/).
