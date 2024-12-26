@@ -61,7 +61,7 @@ library(DT)
 For demonstration purposes, we will be using a dataset available in the `phyloseq` package. This table consists of 19,216 features (OTUs) in rows and 26 samples in columns. Note that this table is not yet rarefied, so we will demonstrate below how to rarefy a feature table in R.
 
 ```{r GlobalPatterns}
-data("GlobalPatterns")
+data('GlobalPatterns')
 feature_table <- as.data.frame(otu_table(GlobalPatterns))
 ```
 

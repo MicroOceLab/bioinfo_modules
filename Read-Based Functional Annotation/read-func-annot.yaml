@@ -1,0 +1,9 @@
+name: read-func-annot-env
+channels:
+  - defaults
+  - conda-forge
+  - bioconda
+dependencies:
+  - pear
+  - diamond
+  - python=3.8

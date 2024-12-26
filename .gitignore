@@ -1,0 +1,8 @@
+.ipynb_checkpoints/
+*/.ipynb_checkpoints/
+.Rproj.user/
+modules.Rproj
+.Rhistory
+Differential\ Abundance\ of\ Microbiome\ Data/ANCOM-BC2_cache/
+Differential\ Expression\ Analysis/DESeq2_cache/
+WGCNA/Standard-WGCNA_cache/

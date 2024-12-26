@@ -1,0 +1,249 @@
+---
+title: "Differential Abundance for Compositional Microbiome Data (ANCOM-BC2)"
+author: "MOLab"
+date: "2024-11-14"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 2
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+knitr::knit_hooks$set(
+   error = function(x, options) {
+     paste('\n\n<div class="alert alert-danger">',
+           gsub('##', '\n', gsub('^##\ Error', '**Error**', x)),
+           '</div>', sep = '\n')
+   },
+   warning = function(x, options) {
+     paste('\n\n<div class="alert alert-warning">',
+           gsub('##', '\n', gsub('^##\ Warning:', '**Warning**', x)),
+           '</div>', sep = '\n')
+   },
+   message = function(x, options) {
+     paste('\n\n<div class="alert alert-info">',
+           gsub('##', '\n', x),
+           '</div>', sep = '\n')
+   }
+)
+```
+
+---
+
+# Overview
+
+Differential abundance analysis is a critical step in microbiome studies, aiming to identify taxa whose relative abundance differs significantly between groups or conditions. However, identification of differentially abundant species based on compositional data (e.g. NGS) requires appropriate statistical handling not typical for absolute count data. ANCOM-BC2 addresses this by employing various statistical methodologies to ensure that the results capture the differentially abundant taxon.
+
+---
+
+# References
+
+More detailed discussion about ANCOM-BC2 can be found [here](https://www.bioconductor.org/packages/release/bioc/vignettes/ANCOMBC/inst/doc/ANCOMBC2.html).
+
+---
+
+# Load Libraries
+
+```{r warning=F, message=F}
+library(ANCOMBC)
+library(qiime2R)
+library(phyloseq)
+library(dplyr)
+library(tidyr)
+library(microbiome)
+library(plyr)
+library(DT)
+```
+
+---
+
+# Load Data
+
+## `phyloseq` Demo Data
+
+### Feature Table
+
+For demonstration purposes, we will be using a dataset available in the `phyloseq` package. This table consists of 19,216 features (OTUs) in rows and 26 samples in columns. Since ANCOM-BC2 may take a while to run, we will subset this table a take the first 100 features only. Additionally, note that **this table is not rarefied** since ANCOM-BC2 performs its own normalization procedure.
+
+```{r GlobalPatterns}
+data("GlobalPatterns")
+feature_table <- as.data.frame(otu_table(GlobalPatterns))[1:100, ]
+```
+
+Here are the first few lines of the feature table.
+
+```{r, echo=F}
+datatable(head(feature_table), options=list(scrollX=T))
+```
+
+### Taxonomy Table (Optional)
+
+A taxonomy table is optional. Having one allows you to perform differential abundance analysis at a specified taxonomic level. If this is relevant to you, a sample taxonomy table is shown below. The row names should correspond to the feature IDs, and the column names should follow the 7-level taxonomy rank (i.e. Kingdom, Phylum, Class, Order, Family, Genus, Species).
+
+In the demo below, we will not be using a taxonomy table.
+
+```{r, echo=F}
+datatable(head(as.data.frame(tax_table(GlobalPatterns))), options=list(scrollX=T))
+```
+
+### Metadata
+
+Additionally, we will also make use of the metadata file associated with the samples. Make sure that the row names correspond to the sample names.
+
+```{r}
+metadata <- as(sample_data(GlobalPatterns), 'data.frame')
+names(metadata)[1] <- 'Samples'  # Convert column name from X.SampleID to Samples
+```
+
+```{r}
+str(metadata)
+```
+
+## Loading Your Own Data
+
+<details>
+<summary>Click to expand</summary>
+<br>
+
+If you want to use your own data, some ways to load your feature tables as dataframe in R are outlined below.
+
+<div class="alert alert-info"><b>Note:</b> Preferably, you should set the working directory first to where your relevant files are located. To do that, you can go to "Session > Set Working Directory > Choose Directory ..." or better yet, you can use the <code>setwd()</code> function.</div>
+
+### QIIME Artifact
+
+You can directly load your table from a `.qza` file (type `FeatureData[Frequency]`) to an R dataframe using the package `qiime2R`.
+
+```{r eval=F}
+feature_table <- read_qza('feature-table.qza')
+```
+
+### TSV
+
+Alternatively, if you have a tab-separated file, you can use the `read.table` function. We assume here that your `feature-table.tsv` file has (1) sample names in row 1, and (2) has feature IDs in column 1. If not, you can format your table in Excel or alter the code below.
+
+```{r eval=F}
+feature_table <- read.table('feature-table.tsv', sep='\t', header=T, row.names=1)
+```
+
+## Pre-Process Data
+
+After loading the data, we need to convert them to a `phyloseq` object. First, we convert the feature table to matrix.
+
+```{r}
+feature_table <- as.matrix(feature_table)
+```
+
+Then generate a `phyloseq` object from the `feature_table` and metadata `metadata` variables.
+
+```{r}
+feature_phyloseq <- otu_table(feature_table, taxa_are_rows=TRUE)
+metadata_phyloseq <- sample_data(metadata)
+```
+
+Finally, put them in a single object.
+
+```{r}
+data_phyloseq <- phyloseq(feature_phyloseq, metadata_phyloseq)
+```
+
+Now, the data is ready for ANCOM-BC2.
+
+---
+
+# ANCOM-BC2
+
+## Run Pipeline
+
+The `ancombc2` function infers which OTU/ASV (or taxa) are differentially abundant across the group of interest, based on their normalized abundances.
+
+Based on the metadata we have, we assume that the OTU abundances are influenced by variable `SampleType` only. Hence, we indicate it in the `fix_formula` argument. Additionally, if you used a taxonomy table (and collated it in the `data_phyloseq` object), you perform the analysis at a specified taxonomic level using the `tax_level` argument.
+
+<div class="alert alert-info"><b>Note:</b> Depending on your study design, you may need to add more variables in the <tt>fix_formula</tt> argument. For instance, if you believe that <tt>Region</tt> and <tt>Season</tt> influences the abundances of the microbes, then you may indicate both (i.e. <tt>fix_formula='Region+Season'</tt></div>
+
+<div class="alert alert-info"><b>Note:</b> The runtime as about 20 minutes.</div>
+
+```{r, cache=T, warning=F, message=F}
+ancom_out <- ancombc2(
+  data=data_phyloseq,
+  fix_formula='SampleType',
+  p_adj_method='holm',
+  group='SampleType',
+  global=TRUE,
+  pairwise=TRUE,
+  dunnet=TRUE,
+  verbose=TRUE
+)
+```
+
+## Get Results
+
+The pairwise group comparisons can be accessed using the code below. By default, the level `Feces` of the group `SampleType` was set as the reference group. This means that columns such as `diff_Freshwater` implies that it was compared with respect to `Feces`.
+
+```{r}
+res_pair <- ancom_out$res_pair
+```
+
+For a quick demonstration, we only show the OTUs that are differentially abundant between sample group `Sediment (estuary)` and `Freshwater (creek)`. Below, we create a new dataframe for those OTUs.
+
+```{r}
+res_pair1 <- res_pair %>%
+  filter(`diff_SampleTypeSediment (estuary)_SampleTypeFreshwater (creek)`==1) %>%
+  select(
+    taxon,
+    `diff_SampleTypeSediment (estuary)_SampleTypeFreshwater (creek)`,
+    `lfc_SampleTypeSediment (estuary)_SampleTypeFreshwater (creek)`,
+    `q_SampleTypeSediment (estuary)_SampleTypeFreshwater (creek)`,
+    `se_SampleTypeSediment (estuary)_SampleTypeFreshwater (creek)`
+  )
+
+# Rename the columns to make more neat
+names(res_pair1) <- c(
+  'taxon',
+  'is_diff_abun',
+  'LFC',
+  'q-value',
+  'SE'
+)
+```
+
+```{r, echo=F}
+datatable(res_pair1, options=list(scrollX=T))
+```
+
+
+Positive values in the `LFC` column indicate that the OTU is more abundant in the former sample group (`Sediment (estuary)`) compared to the latter group (`Freshwater (creek)`).
+
+## Visualize
+
+From these results, we can generate different visuals. Let's try creating a simple barplot that shows the log fold change of the DA features.
+
+```{r}
+res_pair1 %>%
+  mutate(LFC_dir=ifelse(LFC > 0, 'Positive', 'Negative')) %>%
+  ggplot(aes(x=taxon, y=LFC, fill=LFC_dir)) +
+  geom_bar(stat='identity', color='black') +
+  geom_errorbar(aes(ymin=LFC-SE, ymax=LFC+SE), width=0.2) +
+  theme_bw() +
+  ggtitle('Log fold changes of features sample pair') +
+  ylab('Log fold change') +
+  theme(
+    plot.title=element_text(hjust=0.5, face='bold'),
+    axis.text.x=element_text(
+      angle=45,
+      hjust=1
+    ),
+    panel.grid.minor=element_blank()
+  )
+```
+
+---
+
+# Session Info
+
+```{r}
+sessionInfo()
+```
+

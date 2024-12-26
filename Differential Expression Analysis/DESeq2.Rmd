@@ -1,0 +1,296 @@
+---
+title: "Differential Expression Analysis Using DESeq2"
+author: "MOLab"
+date: "2024-11-14"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 2
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+knitr::knit_hooks$set(
+   error = function(x, options) {
+     paste('\n\n<div class="alert alert-danger">',
+           gsub('##', '\n', gsub('^##\ Error', '**Error**', x)),
+           '</div>', sep = '\n')
+   },
+   warning = function(x, options) {
+     paste('\n\n<div class="alert alert-warning">',
+           gsub('##', '\n', gsub('^##\ Warning:', '**Warning**', x)),
+           '</div>', sep = '\n')
+   },
+   message = function(x, options) {
+     paste('\n\n<div class="alert alert-info">',
+           gsub('##', '\n', x),
+           '</div>', sep = '\n')
+   }
+)
+```
+
+---
+
+# Overview
+
+Differential expression analysis is a statistical method used to identify genes or other features (e.g., transcripts) that show significant differences in expression levels between two or more conditions or groups. It is a cornerstone of transcriptomics studies, often applied to RNA-seq data, to understand how biological systems respond to different treatments, conditions, or phenotypes.
+
+In this guide, we explore how DESeq2 is can be used to infer differentially expressed transcript or genes between two sample groups.
+
+---
+
+# Reference
+
+More detailed discussion of the DESeq2 analysis pipeline can be found [here](https://bioconductor.org/packages/devel/bioc/vignettes/DESeq2/inst/doc/DESeq2.html#quick-start).
+
+---
+
+# Load Libraries
+
+```{r warning=F, message=F}
+library(DESeq2)
+library(ggplot2)
+library(readr)
+library(tximport)
+library(EnhancedVolcano)
+library(dplyr)
+library(pheatmap)
+library(airway)
+library(DT)
+```
+
+---
+
+# Data Preparation
+
+## `airway` Demo Data
+
+### Feature Table
+
+For demonstration purposes, we will be using a dataset available in the `airway` package. The data provided is already in the form of a count matrix. If you estimated your gene/transcript counts using, for example, RSEM and/or Salmon, check the section on **Loading Your Own Data** below. The instructions there may be more relevant in importing data derived from these tools.
+
+The RNA-seq experiment consists four samples of each treatment group (dexamethasone versus placebo). In the subsequent steps, we will be estimating the fold change of the genes for treated and placebo samples. We can see more information about the data in the following commands.
+
+```{r airway}
+data('airway')
+counts_matrix <- as.data.frame(assay(airway, "counts"))
+```
+
+```{r}
+(datatable(head(counts_matrix), options=list(scrollX=T)))
+```
+
+### Metadata
+
+Additionally, we will also make use of the metadata file associated with the samples.
+
+```{r Metadata}
+sample_metadata <- as.data.frame(colData(airway))
+```
+
+```{r}
+str(sample_metadata)
+```
+
+### Create a DESeq2 Object
+
+The order of the samples in the columns of the count matrix (`counts_matrix`) MUST be the same as the order of the row names in the metadata (`sample_metadata`). First, we verify if we satisfy this format.
+
+Check the column names of the count matrix.
+
+```{r}
+(datatable(head(counts_matrix, n=2), options=list(scrollX=T)))
+```
+
+Check the row names of the metadata.
+
+```{r}
+(datatable(sample_metadata, options=list(scrollX=T)))
+```
+
+Since the data satisfies the required formatting, we can directly create a DESeq2 object. If this is not the case, you must first reorder either the column names of the count matrix or the row names of the metadata.
+
+```{r DESeq2Object}
+dds <- DESeqDataSetFromMatrix(
+  countData=counts_matrix,
+  colData=sample_metadata,
+  design=~dex
+)
+```
+
+
+## Loading Your Own Data
+
+<details>
+<summary>Click to expand</summary>
+<br>
+
+When loading your own data, the approach depends on how you produced your data. If you used RSEM as shown in the **Mapping Module**, you can follow the steps below.
+
+### Define Filepath
+
+First, we create a list where the RSEM outputs (`RSEM.genes.results` or `RSEM.isoforms.results`) are located. Below, we assume that the output files for all samples are located inside the `rsem-mapping` folder.
+
+```{r eval=F}
+rsem_files <- Sys.glob('rsem-mapping/*/rsem/RSEM.genes.results')
+```
+
+Then we create a labeled list. Check the order to which samples are listed in the `rsem_files` vector, and edit the code below accordingly.
+
+```{r eval=F}
+names(rsem_files) <- c(
+  'NT1xNT2_I', 'NT1xNT2_II', 'NT1xNT2_III',
+  'T1xNT2_a', 'T1xNT2_b', 'T1xNT2_c',
+  'T1xT2_alpha', 'T1xT2_beta', 'T1xT2_delta', 
+  'T2xNT2_B', 'T2xNT2_C', 'T2xNT2_D'
+)
+```
+
+### Import
+
+Now, we can import the RSEM output files using the `tximport` package. In this demonstration, we are importing gene-level annotations. If you are interested in transcript-level annotations, you might be interested in adding the `tx2gene` and `txOut` arguments.
+
+```{r eval=F}
+txi <- tximport(rsem_files, type='rsem')
+```
+
+### Create a DESeq2 Object
+
+Finally, we DESeq2-recognizable object from the imported RSEM outputs (`txi`), and the metadata file (`sample_metadata`). Additionally, here, we specify the analysis design. This depends on your research design and objective. In the example below, we are interested in comparing Toxic and Non-toxic samples (under the `Toxic` metadata column). Additionally, since we believe that the parental cross (`Cross`) is a confounder, we include it in the model as well.
+
+```{r eval=F}
+dds <- DESeqDataSetFromTximport(
+  txi=txi,
+  colData=sample_metadata,
+  design=~Toxic+Cross
+)
+```
+
+
+---
+
+# DESeq2 Analysis Pipeline
+
+## Run DESeq2
+
+Once data has been imported, running DESeq2 is a fairly straightforward process. The code chunk below essentially runs the entire DESeq2 pipeline.
+
+```{r DESeq2Pipeline, cache=T, message=F, warning=F}
+dds <- DESeq(dds)
+```
+
+## Dispersion Estimates
+
+Plotting the dispersion estimates against the mean (normalized) counts can serve as a helpful diagnostic tool to verify the adequacy of the DESeq2 model fit. The dispersion estimate tells us about the variability of a gene's expression given a mean count. In DESeq2's model, dispersion is inversely related to the mean. Ideally, what we should see in the plot is that as mean count increases, the dispersion estimate should be decreasing.
+
+```{r DispersionEstimates, cache=T}
+plotDispEsts(dds)
+```
+
+## Extract Results
+
+Let's look at the possible comparisons that we can explore.
+
+```{r}
+resultsNames(dds)
+```
+
+From the output above, select the relevant pairing that you want to analyze. In this mock data, we are interested in comparing the treatment and placebo groups (`dex_untrt_vs_trt`). Moreover, we define the log-fold change threshold (`lfcThreshold=1` i.e. two-fold difference) and significance level (`alpha=0.05`).
+
+```{r DESeq2Results, cache=T}
+res <- results(dds, lfcThreshold=1, alpha=0.05, name="dex_untrt_vs_trt")
+```
+
+Finally, we can create a statistical summary of the results.
+
+```{r}
+summary(res)
+```
+
+
+---
+
+# Visuals
+
+## Volcano Plot
+
+The volcano plot shows a quick summary of which genes were inferred to be differentially expressed. If you used different p-value and log-fold change cutoffs, replace the values indicated in the `pCutoff` and `FCcutoff` arguments, respectively.
+
+```{r VolcanoPlot}
+#For unlabeled volcano plot
+EnhancedVolcano(
+  res,
+  lab=NA,
+  x='log2FoldChange',
+  y='padj',
+  pCutoff=5e-02,
+  FCcutoff=1,
+  labSize=2.5,
+  title="Volcano Plot",
+  subtitle=NULL,
+  drawConnectors=TRUE,
+  arrowheads=FALSE,
+)
+```
+
+## Heatmap
+
+We can view the normalized expression level of the differentially expressed genes across samples as a heatmap.
+
+```{r HeatMap}
+# Get normalized counts
+vsd <- vst(dds, blind=TRUE)
+vsd_mat = assay(vsd)
+
+# Get DEG ids
+degs <- row.names(as.data.frame(res) %>%
+  filter(abs(log2FoldChange) > 1 & padj < 0.05)
+)
+
+# Plot
+pheatmap(
+  vsd_mat[degs, ], 
+  main="Heatmap of expression levels (vst) of DEGs", 
+  cluster_rows=FALSE, 
+  cluster_cols=TRUE,
+  show_rownames=FALSE,
+  annotation_col=as.data.frame(colData(dds)[, c("dex"), drop=F])
+)
+```
+
+## MA Plot
+
+The MA plot typically displays how fold changes vary with respect to gene expression level. In the custom MA plot below, we include the dimension of variability (`lfcSE`) to visualize the interplay between these three elements (`baseMean`, `log2FoldChange`, `lfcSE`).
+
+```{r MAPlot}
+res_df = as.data.frame(res)
+res_df = na.omit(res_df)
+
+res_df %>%
+  ggplot(aes(x=baseMean, y=log2FoldChange, size=lfcSE)) +
+  geom_point(
+    na.rm=TRUE,
+    color=ifelse(res_df$padj < 0.05, "red", "grey20"),
+    alpha=0.5,
+    shape=ifelse(abs(res_df$log2FoldChange) > 1, 17, 16)
+  ) +
+  scale_x_log10() +
+  xlab("Mean of normalized counts") +
+  ylab("log fold change") +
+  theme_minimal() +
+  ggtitle("MA Plot") +
+  theme(plot.title=element_text(face="bold", hjust=0.5)) +
+  scale_size_area(limits=c(min(res_df$lfcSE), max(res_df$lfcSE)))
+```
+
+
+---
+
+# Session Info
+
+```{r}
+sessionInfo()
+```
+

@@ -1,0 +1,10 @@
+name: binning-env
+channels:
+  - defaults
+  - conda-forge
+  - bioconda
+dependencies:
+  - metabat2
+  - checkv
+  - checkm-genome
+  - eukcc

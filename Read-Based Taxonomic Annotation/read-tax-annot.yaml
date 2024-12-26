@@ -1,0 +1,9 @@
+name: read-tax-annot-env
+channels:
+  - defaults
+  - conda-forge
+  - bioconda
+dependencies:
+  - kraken2
+  - bracken
+  - krona

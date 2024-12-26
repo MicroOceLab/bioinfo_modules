@@ -1,0 +1,380 @@
+---
+title: "Weighted Gene Coexpression Analysis"
+author: "MOLab"
+date: "2024-11-14"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 2
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+knitr::knit_hooks$set(
+   error = function(x, options) {
+     paste('\n\n<div class="alert alert-danger">',
+           gsub('##', '\n', gsub('^##\ Error', '**Error**', x)),
+           '</div>', sep = '\n')
+   },
+   warning = function(x, options) {
+     paste('\n\n<div class="alert alert-warning">',
+           gsub('##', '\n', gsub('^##\ Warning:', '**Warning**', x)),
+           '</div>', sep = '\n')
+   },
+   message = function(x, options) {
+     paste('\n\n<div class="alert alert-info">',
+           gsub('##', '\n', x),
+           '</div>', sep = '\n')
+   }
+)
+```
+
+---
+
+```{r include=F, eval=F}
+if (!requireNamespace("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+
+BiocManager::install(c("WGCNA", "airway"))
+```
+
+# Load Libraries
+
+```{r warning=F, message=F}
+library(WGCNA)
+library(airway)
+library(DT)
+library(ggplot2)
+```
+
+---
+
+# Data Preparation
+
+## `airway` Demo Data
+
+### Feature Table
+
+For demonstration purposes, we will be using a dataset available in the `airway` package. The RNA-seq experiment consists four samples of each treatment group (dexamethasone versus placebo). We can see more information about the data in the following commands.
+
+<div class="alert alert-warning"><strong>Warning:</strong> The WGCNA authors recommend a minimum of 15 samples when working with WGCNA. The demo data used in this module contains only 8 samples. Nonetheless, we will proceed for the sake of showing the workflow.</div>
+
+```{r airway}
+data('airway')
+counts_matrix <- as.data.frame(assay(airway, "counts"))
+```
+
+```{r}
+(datatable(counts_matrix))
+```
+
+### Metadata
+
+Additionally, we will also make use of the metadata file associated with the samples.
+
+```{r}
+sample_metadata <- as.data.frame(colData(airway))
+```
+
+```{r}
+str(sample_metadata)
+```
+
+## Loading Your Own Data
+
+<details>
+<summary>Click to expand</summary>
+<br>
+
+### TSV
+
+If you want to use your own data, you can generate a count matrix using the `varianceStabilizingTransformation()` function available in `DESeq2` package (see **Differential Expression Analysis Module**). If you have exported the transformed count table (as TSV), you can then import it back using the `read.table()` function. The table should contain the samples in the columns and the features/transcripts in the rows.
+
+```{r eval=F}
+counts_matrix <- read.table(
+  'vst_counts.tsv', 
+  sep='\t', 
+  row.names=1
+)
+```
+
+### Metadata
+
+Similarly, we import the metadata file. The samples should be indicated in the rows, and the variables in the columns.
+
+```{r eval=F}
+sample_metadata <- read.table(
+  'metadata.tsv',
+  sep='\t',
+  row.names=1
+)
+```
+
+## Check Samples and Features
+
+Below, we explore samples and features that are "bad" (i.e. zero variance, missing entries, etc.)
+
+```{r goodSamplesGenes}
+gsg <- goodSamplesGenes(t(counts_matrix), verbose=3)
+```
+
+Check if all samples are good.
+
+```{r}
+gsg$goodSamples
+```
+
+We see that there are genes that were flagged as "bad" in the standard output of `goodSamplesGenes()`. Before we proceed, we remove those "bad" features. 
+
+```{r filterBadGenes}
+filt_counts_matr <- as.data.frame(t(t(counts_matrix)[, gsg$goodGenes]))
+dim(filt_counts_matr)
+```
+
+---
+
+# Filter Expression Matrix
+
+Filtering the expression matrix serves two primary purposes:
+
+1. Reducing dataset dimensionality: This lowers memory requirements and enhances computational efficiency.
+2. Minimizing noise: By removing transcripts with low information value, we can improve the reliability of downstream analyses.
+
+Several filtering criteria can be applied, but here we focus on filtering transcripts based on their variance. The rationale is that transcripts with low variance are less likely to correlate meaningfully with other transcripts and, therefore, contribute little to the construction of co-expression networks in WGCNA.
+
+## Per-feature Variance
+
+Calculate the row-wise variance of the filtered counts matrix, then sort the features from highest to lowest variance.
+
+```{r PerFeatureVariance}
+rv <- rowVars(as.matrix(filt_counts_matr), useNames=T)
+datatable(rv2 <- data.frame(
+  Seq=seq(1:nrow(filt_counts_matr)), 
+  rowVars=rv[order(rv, decreasing=TRUE)]
+))
+```
+
+## Visualize Variance Distribution
+
+```{r VisualizeVariance}
+rv2 %>%
+  ggplot(aes(x=Seq, y=rowVars)) +
+  geom_line() +
+  theme_bw() +
+  scale_y_log10()
+```
+
+Ideally, the filtering threshold should have a biological basis. For example, in the demo dataset used in this tutorial, we select the top 15,000 transcripts (~50% of the total) with the highest variance. This choice is reasonable for human cells, which are known to express approximately this number of transcripts at a given time.
+
+However, for less well-studied organisms, determining an appropriate threshold may require some experimentation. You can start by selecting different proportions of transcripts based on variance (e.g., the top 25%, 50%, or 75%) and then assess the resulting network. Ensure that key network assumptions, such as scale-free topology, are satisfied, and evaluate whether the identified patterns are biologically meaningful.
+
+## Filter
+
+Now we filter the expression matrix based on a pre-defined criterion. First we select the transcripts that pass the threshold.
+
+```{r SelectHighVarianceGenes}
+pct_thresh <- 0.5
+filt_transcripts <- row.names(rv2)[1:round(dim(rv2)[1]*pct_thresh)]
+```
+
+Finally, filter the table based on the selected transcripts (`filt_transcripts`).
+
+```{r FilterByVariance}
+varfilt_counts_matr <- filt_counts_matr[filt_transcripts, ]
+```
+
+
+---
+
+# Soft-Thresholding ($\beta$) Parameter
+
+In WGCNA, the $\beta$ parameter (where $\beta\geq1$) places weights on the correlation between two nodes (features). The equation below shows the weighted adjacency measure ($a_{ij}$) between nodes $i$ and $j$, where $s_{ij}$ is the correlation coefficient between the said nodes.
+
+$$
+a_{ij}=s_{ij}^{\beta}
+$$
+
+This power transformation penalizes weak correlations more heavily, effectively reducing noise in the network. Additionally, it facilitates the construction of networks that approximate a scale-free topology (SFT; i.e. only a few hub genes), a key assumption in WGCNA.
+
+You can see more discussion about these topics in WGCNA's [manual](https://www.dropbox.com/scl/fo/4vqfiysan6rlurfo2pbnk/h?rlkey=thqg8wlpdn4spu3ihjuc1kmlu&e=1&dl=0) and in their [publication](https://bmcbioinformatics.biomedcentral.com/articles/10.1186/1471-2105-9-559).
+
+In the following sections, we will identify what $\beta$ parameter to use for network construction
+
+## Selection of $\beta$
+
+First, we define the range of $\beta$ parameters to test for.
+
+```{r ListBetaParameters}
+powers <- c(c(4:10), seq(from=12, to=40, by=2))
+```
+
+Then use the `pickSoftThreshold()` function to calculate metrics that will aid in the selection of $\beta$ that yields a network with a scale-free topology. We also note that we are calculating for a signed network.
+
+```{r pickSoftThreshold, cache=T}
+(sft <- pickSoftThreshold(
+  t(varfilt_counts_matr), 
+  powerVector=powers, 
+  verbose=5, 
+  networkType="signed"
+))
+```
+
+## Visualize `pickSoftThreshold()` Results
+
+According to the WGCNA [FAQ](https://www.dropbox.com/scl/fo/4vqfiysan6rlurfo2pbnk/h/faq.html?rlkey=thqg8wlpdn4spu3ihjuc1kmlu&dl=0), the scale-free topology (SFT) fit index (first graph below) should be at least 0.8, and the mean connectivity (second graph below) should be below the hundreds. These criteria are designed to ensure that the network adheres to a scale-free topology.
+
+However, as shown below, none of the tested $\beta$ values satisfy both criteria. This outcome may be due to strong drivers in the experiment (e.g. batch effects, treatments, etc.), resulting in a large group of genes with strong correlations.
+
+In cases where SFT criteria are not met, the WGCNA authors recommend alternative approaches. A snippet of their recommendation is provided in the table below.
+
+| Number of Sample | Unsigned and Hybrid Networks | Signed Networks |
+| :-: | :-: | :-: |
+| $<20$ | 9 | 18 |
+| $20-30$ | 8 | 16 |
+| $30-40$ | 7 | 14 |
+| $>40$ | 6 | 12 |
+
+Based on the table above, we select $\beta=18$ as the soft-thresholding parameter.
+
+### Scale independence versus $\beta$
+
+```{r ScaleIndependencePlot}
+cex1 = 0.9
+
+plot(
+  sft$fitIndices[, 1], 
+  -sign(sft$fitIndices[, 3])*sft$fitIndices[, 2],
+  xlab="Beta", ylab="Scale Free Topology Model Fit, signed R^2", 
+  type="n",
+  main=paste("Scale independence"))
+text(
+  sft$fitIndices[,1], 
+  -sign(sft$fitIndices[,3])*sft$fitIndices[,2],
+  labels=powers, 
+  cex=cex1, 
+  col="red")
+```
+
+### Mean connectivity versus $\beta$
+
+```{r MeanConnectivityPlot}
+plot(
+  sft$fitIndices[,1], 
+  sft$fitIndices[,5], 
+  xlab="Beta", ylab="Mean Connectivity", 
+  type="n", 
+  main=paste("Mean Connectivity"))
+text(
+  sft$fitIndices[,1], 
+  sft$fitIndices[,5], 
+  labels=powers, 
+  cex=cex1,
+  col="red")
+```
+
+# Adjacency Matrix and Topoological Overlap Matrix (TOM)
+
+## Adjacency Matrix
+
+Now we have selected the value for $\beta$, we can proceed in the calculation of the adjacency matrix. As mentioned above, this is a weighted measure of the correlation between a pair of nodes. We calculate for a signed correlation so we know the directionality of association.
+
+```{r AdjacencyMatrix, cache=T}
+soft_power <- 18
+
+adj_mat <- adjacency(
+  t(varfilt_counts_matr), 
+  power=soft_power,
+  type="signed"
+)
+```
+
+## Topoological Overlap Matrix (TOM)
+
+The topological overlap matrix (TOM) is a way to measure how closely related two nodes are within a network, considering not just their direct connection (correlation) but also their shared connections (overlaps) with other genes. TOM helps make the network more robust by emphasizing groups of genes that are co-expressed in similar patterns, which is useful for identifying gene modules.
+
+Below, we calculate the TOM from the adjacency matrix.
+
+```{r TOM, cache=T}
+TOM <- TOMsimilarity(adj_mat, TOMType="signed")
+```
+
+Afterwards, we convert TOM to a dissimilarity measure.
+
+```{r dissTom, cache=T}
+dissTom = 1 - TOM
+```
+
+---
+
+# Generate Modules
+
+## Identify Clusters
+
+### Create Tree
+
+To cluster the features into modules, we have to create a dendrogram from the TOM first.
+
+```{r TOMToTree, cache=T}
+gene_tree <- hclust(as.dist(dissTom), method="average")
+```
+
+### Cut Dendrogram
+
+From the generated tree, we use the `cutreeDynamic()` function to dynamically select the heights where the tree should be cut to produce clusters. The `deepSplit` argument sets the sensitivity of the cutting. This could range from 0 to 4 where higher values produce more yet smaller clusters.
+
+```{r cutreeDynamic, cache=T}
+dynamic_mods_ds0_pamstageF = cutreeDynamic(
+  dendro=gene_tree,
+  distM=dissTom,
+  deepSplit=0, 
+  pamRespectsDendro=FALSE,
+  pamStage=FALSE
+)
+```
+
+## Visualize Modules
+
+### Modules to Colors
+
+To make visuals more appealing, we convert the module/cluster labels to colors.
+
+```{r}
+dynamic_colors_ds0_pamstageF <- labels2colors(dynamic_mods_ds0_pamstageF)
+```
+
+The module sizes are summarized below. By default, the `grey` module contains the transcripts that could not be clustered into the other modules.
+
+```{r}
+table(dynamic_colors_ds0_pamstageF)
+```
+
+### Modules in Dendrogram
+
+The plot below shows a dendrogram with module color annotations.
+
+```{r ColoredDendrogram}
+plotDendroAndColors(
+  gene_tree, 
+  dynamic_colors_ds0_pamstageF, 
+  "Dynamic Tree Cut",
+  dendroLabels=FALSE,
+  hang=0,
+  addGuide=FALSE,
+  guideHang=0.05,
+  main="Gene dendogram and module colors"
+)
+```
+
+After this step, you can refer to `WGCNA Analysis.Rmd` for subsequent steps you can do to explore your data (e.g. module-trait correlation, module membership, and gene significance).
+
+
+---
+
+# Session Info
+
+```{r}
+sessionInfo()
+```
+

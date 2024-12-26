@@ -1,0 +1,11 @@
+name: func-annot-env
+channels:
+  - defaults
+  - conda-forge
+  - bioconda
+dependencies:
+  - prodigal
+  - prokka
+  - blast
+  - diamond
+  - metaeuk

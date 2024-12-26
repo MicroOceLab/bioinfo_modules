@@ -1,0 +1,11 @@
+name: quality-control-env
+channels:
+  - defaults
+  - conda-forge
+  - bioconda
+dependencies:
+  - fastqc
+  - trimmomatic
+  - multiqc
+  - minimap2
+  - samtools
