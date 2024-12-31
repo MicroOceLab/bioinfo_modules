@@ -1,0 +1,3 @@
+# QIIME2 Metabarcoding Denoising Module
+
+Denoising of metabarcoding data, unlike OTU clustering, aims to recover sequences that are as close as possible to the true biological sequences present in the sample, correcting for sequencing errors and other technical artifacts. In this module, we will learn how to use DADA2 in QIIME2 to denoise metabarcoding data and generate ASV sequences and count tables.

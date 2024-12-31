@@ -2,7 +2,7 @@
 <html>
 <head><meta charset="utf-8" />
 
-<title>Taxonomic Annotation</title>
+<title>Read Mapping</title>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.1.10/require.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/2.0.3/jquery.min.js"></script>
@@ -13192,9 +13192,9 @@ div#notebook {
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h1 id="Module:-Taxonomic-Annotation">Module: Taxonomic Annotation<a class="anchor-link" href="#Module:-Taxonomic-Annotation">&#182;</a></h1><p>Taxonomic annotation of contigs (and bins) is a crucial step in metagenomic analysis, enabling the identification and classification of microbial communities from sequencing data. Contigs, which are contiguous sequences assembled from reads, can be annotated by comparing them to reference databases to determine their likely taxonomic origin. By doing so, we gain insights into the diversity of microorganisms within a sample.</p>
-<p>In this module, we explore different tools commonly used for taxonomic classification of contigs and bins.</p>
-<p>Created by: Microbial Oceanography Laboratory (MOLab)</p>
+<h1 id="Module:-Read-Mapping">Module: Read Mapping<a class="anchor-link" href="#Module:-Read-Mapping">&#182;</a></h1><p>Mapping of reads to reference sequences or assemblies is a crucial step in bioinformatics that involves aligning sequencing reads to a known reference genome, transcriptome, or de novo assembly. This process enables researchers to identify sequence variants, quantify gene expression, and analyze the abundance of specific genomic regions.</p>
+<p>Here, we will look at a couple of read mapping utilities that are commonly used for different applications.</p>
+<p>Created by: <em>Microbial Oceanography Laboratory (MOLab)</em></p>
 
 </div>
 </div>
@@ -13205,25 +13205,7 @@ div#notebook {
 <hr>
 <h2 id="How-to-Use-This-Notebook">How to Use This Notebook<a class="anchor-link" href="#How-to-Use-This-Notebook">&#182;</a></h2><ol>
 <li>Make sure tools are installed already (see below if not yet).</li>
-<li>Activate environment. Replace environment name accordingly.<div class="highlight"><pre><span></span>conda activate tax-annot-env
-</pre></div>
-</li>
-<li>Open jupyter notebook with the command below and select the notebook.<div class="highlight"><pre><span></span>jupyter notebook
-</pre></div>
-</li>
-<li>To run the cells in this notebook, press Shift+Enter.</li>
-</ol>
-
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<hr>
-<h2 id="How-to-Use-This-Notebook">How to Use This Notebook<a class="anchor-link" href="#How-to-Use-This-Notebook">&#182;</a></h2><ol>
-<li>Make sure tools are installed already (see below if not yet).</li>
-<li>Activate environment. Replace environment name accordingly.<div class="highlight"><pre><span></span>conda activate tax-annot-env
+<li>Activate environment. Replace environment name accordingly.<div class="highlight"><pre><span></span>conda activate mapping-env
 </pre></div>
 </li>
 <li>Open jupyter notebook with the command below and select the notebook.<div class="highlight"><pre><span></span>jupyter notebook
@@ -13240,15 +13222,13 @@ div#notebook {
 <div class="text_cell_render border-box-sizing rendered_html">
 <hr>
 <h2 id="Tools-Used">Tools Used<a class="anchor-link" href="#Tools-Used">&#182;</a></h2><ol>
-<li><strong>EukRep</strong></li>
-<li><strong>VirSorter2</strong></li>
-<li><strong>MMSeqs2</strong></li>
-<li><strong>Bin Annotation Tool (BAT)</strong></li>
+<li><strong>BBMap</strong> for prokaryotic gene prediction.</li>
+<li><strong>Trinity</strong> for eukaryotic gene prediction.</li>
 </ol>
-<p>To install tools (1) - (3), find the tax-annot.yaml file located in the same folder as this notebook (in repository). Then run the command below in the terminal:</p>
-<div class="highlight"><pre><span></span>conda env create -f tax-annot.yaml
+<p>To install tool (1), find the <code>mapping.yaml</code> file located in the same folder as this notebook (in repository). Then run the command below in the terminal:</p>
+<div class="highlight"><pre><span></span>conda env create -f mapping.yaml
 </pre></div>
-<p>Since tool (4) requires high memory (due to size of databased used), it is better if it is accessed through HPCs or <a href="https://usegalaxy.eu/">EU Galaxy Webserver</a>.</p>
+<p>To install tool (2), a Docker image of Trinity can be pulled. Instructions are outlined here: <a href="https://github.com/trinityrnaseq/trinityrnaseq/wiki/Trinity-in-Docker">Trinity Docker Installation</a>.</p>
 
 </div>
 </div>
@@ -13258,8 +13238,8 @@ div#notebook {
 <div class="text_cell_render border-box-sizing rendered_html">
 <hr>
 <h2 id="Starting-Files">Starting Files<a class="anchor-link" href="#Starting-Files">&#182;</a></h2><ol>
-<li>A contig FASTA file (<code>assembly_contigs.fa</code>) generated from assembly (see <strong>Assembly Module</strong>).</li>
-<li>A FASTA file of a metagenome-assembled genome or bin (<code>bin_7.fa</code>; see <strong>Binning Module</strong>).</li>
+<li>A contig FASTA file generated from assembly (see <strong>Assembly Module</strong>) or binning (see <strong>Binning Module</strong>) or other reference assembly retrieved from databases (<code>assembly.fasta</code>).</li>
+<li>Clean reads (see <strong>Quality Control Module</strong>).</li>
 </ol>
 
 </div>
@@ -13269,7 +13249,10 @@ div#notebook {
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
 <hr>
-<h2 id="Expected-Outputs">Expected Outputs<a class="anchor-link" href="#Expected-Outputs">&#182;</a></h2><p>Output(s) may depend on the tool used.</p>
+<h2 id="Expected-Outputs">Expected Outputs<a class="anchor-link" href="#Expected-Outputs">&#182;</a></h2><p>Output(s) may depend on the tool used, but generally, the following outputs will be present:</p>
+<ol>
+<li>SAM/BAM alignment files.</li>
+</ol>
 
 </div>
 </div>
@@ -13279,10 +13262,8 @@ div#notebook {
 <div class="text_cell_render border-box-sizing rendered_html">
 <hr>
 <h2 id="Table-of-Contents">Table of Contents<a class="anchor-link" href="#Table-of-Contents">&#182;</a></h2><ul>
-<li><a href="#Prodigal"><strong>EukRep</strong></a>  </li>
-<li><a href="#AUGUSTUS"><strong>VirSorter2</strong></a>  </li>
-<li><a href="#Prokka"><strong>MMSeqs2</strong></a>  </li>
-<li><a href="#BLAST"><strong>Bin Annotation Tool (BAT)</strong></a></li>
+<li><a href="#Prodigal"><strong>BBMap</strong></a>  </li>
+<li><a href="#AUGUSTUS"><strong>Trinity Wrapper Script</strong></a></li>
 </ul>
 
 </div>
@@ -13292,14 +13273,15 @@ div#notebook {
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
 <hr>
-<h1 id="EukRep"><font color="gray">EukRep</font><a class="anchor-link" href="#EukRep">&#182;</a></h1>
+<h1 id="BBMap"><font color="gray">BBMap</font><a class="anchor-link" href="#BBMap">&#182;</a></h1>
 </div>
 </div>
 </div>
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<p><code>EukRep</code> is a tool designed to identify eukaryotic contigs in metagenomic datasets by analyzing k-mer profiles. While it does not provide specific taxonomic classifications for the identified contigs, it excels in isolating the eukaryotic fraction of the dataset. This makes it particularly useful for downstream analyses that focus on diversity, functional potential, or evolutionary relationships of eukaryotes within a metagenomic sample.</p>
+<p>BBMap is a splice-aware global aligner for DNA and RNA sequencing reads. It can align reads from all major platforms – Illumina, 454, Sanger, Ion Torrent, PacBio, and Nanopore. BBMap is fast and extremely accurate, particularly with highly mutated genomes or reads with long indels, even whole-gene deletions over 100kbp long.</p>
+<p>Source: <a href="https://jgi.doe.gov/data-and-tools/software-tools/bbtools/bb-tools-user-guide/bbmap-guide/">BBMap Guide</a></p>
 
 </div>
 </div>
@@ -13307,14 +13289,81 @@ div#notebook {
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h3 id="How-to-run?">How to run?<a class="anchor-link" href="#How-to-run?">&#182;</a></h3>
+<p>The code below will align your paired end reads (<code>S1_forward.fastq.gz</code> and <code>S1_reverse.fastq.gz</code>) and output an alignment file (<code>S1_mapping.sam</code>).</p>
+
 </div>
 </div>
 </div>
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<p>To run <code>EukRep</code>, you simply need to provide the FASTA file of contigs.</p>
+<div class="alert alert-block alert-info">
+<b>Note:</b> 
+
+The command only maps a single library to a reference assembly. If you have a multi-sample dataset, you need to modify the sample names every run or write a loop to automate mapping of samples.
+</div>
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[&nbsp;]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">!</span>bbmap.sh <span class="err">\</span>
+    <span class="ow">in</span><span class="o">=</span><span class="n">S1_forward</span><span class="o">.</span><span class="n">fastq</span><span class="o">.</span><span class="n">gz</span> \
+    <span class="n">in2</span><span class="o">=</span><span class="n">S1_reverse</span><span class="o">.</span><span class="n">fastq</span><span class="o">.</span><span class="n">gz</span> \
+    <span class="n">ref</span><span class="o">=</span><span class="n">assembly</span><span class="o">.</span><span class="n">fasta</span> \
+    <span class="n">out</span><span class="o">=</span><span class="n">S1_mapping</span><span class="o">.</span><span class="n">sam</span> \
+    <span class="n">bamscript</span><span class="o">=</span><span class="n">S1_bamscript</span>
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>If you need a sorted and indexed BAM file, you can use the output script file (<code>S1_bamscript</code>).</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing code_cell rendered">
+<div class="input">
+<div class="prompt input_prompt">In&nbsp;[&nbsp;]:</div>
+<div class="inner_cell">
+    <div class="input_area">
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">!</span>s1_bamscript
+</pre></div>
+
+    </div>
+</div>
+</div>
+
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<hr>
+<h1 id="Trinity-Wrapper-Script"><font color="gray">Trinity Wrapper Script</font><a class="anchor-link" href="#Trinity-Wrapper-Script">&#182;</a></h1>
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<p>If you intend to map reads to an RNA-seq assembly made using Trinity, a wrapper script which performs the alignment and estimates the abundance of the transcripts is provided by Trinity.</p>
+
+</div>
+</div>
+</div>
+<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
+</div><div class="inner_cell">
+<div class="text_cell_render border-box-sizing rendered_html">
+<h3 id="Prepare-Reference-Assembly">Prepare Reference Assembly<a class="anchor-link" href="#Prepare-Reference-Assembly">&#182;</a></h3><p>First, we have to index the reference assembly so that we don't have to repeat it every time for each library/sample.</p>
 
 </div>
 </div>
@@ -13330,12 +13379,20 @@ div#notebook {
 </thead>
 <tbody>
 <tr>
-<td style="text-align:center"><code>-i</code></td>
-<td style="text-align:left">Input contig FASTA file.</td>
+<td style="text-align:center"><code>--transcripts</code></td>
+<td style="text-align:left">Reference assembly.</td>
 </tr>
 <tr>
-<td style="text-align:center"><code>-o</code></td>
-<td style="text-align:left">Output filename of predicted eukaryotic sequences.</td>
+<td style="text-align:center"><code>--est_method</code></td>
+<td style="text-align:left">Abundance estimation method.</td>
+</tr>
+<tr>
+<td style="text-align:center"><code>--aln_method</code></td>
+<td style="text-align:left">Alignment method.</td>
+</tr>
+<tr>
+<td style="text-align:center"><code>--prep_reference</code></td>
+<td style="text-align:left">Prepare reference assembly file.</td>
 </tr>
 </tbody>
 </table>
@@ -13348,9 +13405,12 @@ div#notebook {
 <div class="prompt input_prompt">In&nbsp;[&nbsp;]:</div>
 <div class="inner_cell">
     <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">!</span>EukRep <span class="err">\</span>
-    <span class="o">-</span><span class="n">i</span> <span class="n">assembly_contigs</span><span class="o">.</span><span class="n">fa</span> \
-    <span class="o">-</span><span class="n">o</span> <span class="n">euk_contigs</span><span class="o">.</span><span class="n">fa</span> 
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">!</span>docker run --rm -v <span class="s2">&quot;</span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span><span class="s2">&quot;</span>:<span class="s2">&quot;</span><span class="k">$(</span><span class="nb">pwd</span><span class="k">)</span><span class="s2">&quot;</span> trinityrnaseq/trinityrnaseq <span class="err">\</span>
+    <span class="o">/</span><span class="n">usr</span><span class="o">/</span><span class="n">local</span><span class="o">/</span><span class="nb">bin</span><span class="o">/</span><span class="n">util</span><span class="o">/</span><span class="n">align_and_estimate_abundance</span><span class="o">.</span><span class="n">pl</span> \
+    <span class="o">--</span><span class="n">transcripts</span> <span class="s2">&quot;$(pwd)/assembly.fasta&quot;</span> \
+    <span class="o">--</span><span class="n">est_method</span> <span class="n">RSEM</span> \
+    <span class="o">--</span><span class="n">aln_method</span> <span class="n">bowtie2</span> \
+    <span class="o">--</span><span class="n">prep_reference</span>
 </pre></div>
 
     </div>
@@ -13361,130 +13421,7 @@ div#notebook {
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
-<h3 id="What-are-its-outputs?">What are its outputs?<a class="anchor-link" href="#What-are-its-outputs?">&#182;</a></h3>
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<p>As mentioned above, <code>EukRep</code> will output a FASTA file containing the contigs inferred as eukaryotic.</p>
-
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<div class="alert alert-block alert-warning">
-<b>Warning</b> 
-
-You can also pull out the prokaryotic contigs using the <code>--prokarya</code> argument. However, for <code>EukRep</code>, prokaryotic contigs are simply the sequences not inferred as eukaryotic by their model. This is not entirely accurate since some of the contigs may be of viral nature.
-</div>
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<hr>
-<h1 id="VirSorter2"><font color="gray">VirSorter2</font><a class="anchor-link" href="#VirSorter2">&#182;</a></h1>
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<p>VirSorter2 uses multiple classifiers to identify diverse DNA and RNA viral sequences.</p>
-
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<h3 id="How-to-run?">How to run?<a class="anchor-link" href="#How-to-run?">&#182;</a></h3>
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<p>Before doing viral contig inference, the database must be setup first. To do so, download the database using the command below. Alternatively, you can download the database manually from this link: <a href="https://osf.io/v46sc/download">https://osf.io/v46sc/download</a></p>
-
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[&nbsp;]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">!</span>virsorter setup -d db -j <span class="m">4</span>
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<p>Afterwards, extract the downloaded compressed file.</p>
-
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[&nbsp;]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">!</span>tar -xzf db.tgz
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<p>Then run the setup configuration command.</p>
-
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[&nbsp;]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">!</span>virsorter config --init-source --db-dir<span class="o">=</span>./db
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<div class="alert alert-block alert-info">
-<b>Note</b>: 
-
-You only need to setup the database on the first instance that you will be using virsorter.
-</div>
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<p>After setting up the database, you can now identify viral contigs in your dataset. A sample command is displayed below.</p>
+<h3 id="Map-and-Estimate">Map and Estimate<a class="anchor-link" href="#Map-and-Estimate">&#182;</a></h3><p>Now, using Bowtie2 and RSEM, we can map the clean reads to the assembly (<code>assembly.fasta</code>) and estimate the abundances of the transcripts.</p>
 
 </div>
 </div>
@@ -13500,24 +13437,32 @@ You only need to setup the database on the first instance that you will be using
 </thead>
 <tbody>
 <tr>
-<td style="text-align:center"><code>-w</code></td>
-<td style="text-align:left">Output filename.</td>
+<td style="text-align:center"><code>--transcripts</code></td>
+<td style="text-align:left">Reference assembly.</td>
 </tr>
 <tr>
-<td style="text-align:center"><code>-i</code></td>
-<td style="text-align:left">Input contig FASTA file.</td>
+<td style="text-align:center"><code>--seqType</code></td>
+<td style="text-align:left">Type of sequence. FASTA (<code>fa</code>) or FASTQ (<code>fq</code>)</td>
 </tr>
 <tr>
-<td style="text-align:center"><code>--min-length</code></td>
-<td style="text-align:left">Minimum contig length to be included for analysis.</td>
+<td style="text-align:center"><code>--left</code></td>
+<td style="text-align:left">Left strand read.</td>
 </tr>
 <tr>
-<td style="text-align:center"><code>-j</code></td>
-<td style="text-align:left">Number of threads.</td>
+<td style="text-align:center"><code>--right</code></td>
+<td style="text-align:left">Right strand read.</td>
 </tr>
 <tr>
-<td style="text-align:center"><code>all</code></td>
-<td style="text-align:left">Run the whole pipeline.</td>
+<td style="text-align:center"><code>--est_method</code></td>
+<td style="text-align:left">Tool to use to estimate transcript abundance.</td>
+</tr>
+<tr>
+<td style="text-align:center"><code>--aln_method</code></td>
+<td style="text-align:left">Tool to use to map reads to assembly.</td>
+</tr>
+<tr>
+<td style="text-align:center"><code>--output_dir</code></td>
+<td style="text-align:left">Output directory.</td>
 </tr>
 </tbody>
 </table>
@@ -13525,113 +13470,14 @@ You only need to setup the database on the first instance that you will be using
 </div>
 </div>
 </div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[&nbsp;]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">!</span>virsorter run <span class="err">\</span>
-    <span class="o">-</span><span class="n">w</span> <span class="n">test</span><span class="o">.</span><span class="n">out</span> \
-    <span class="o">-</span><span class="n">i</span> <span class="n">test</span><span class="o">.</span><span class="n">fa</span> \
-    <span class="o">--</span><span class="nb">min</span><span class="o">-</span><span class="n">length</span> <span class="mi">1500</span> \
-    <span class="o">-</span><span class="n">j</span> <span class="mi">4</span> \
-    <span class="nb">all</span>
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<h3 id="What-are-its-outputs?">What are its outputs?<a class="anchor-link" href="#What-are-its-outputs?">&#182;</a></h3>
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<p>Detailed descriptions of outputs are discussed here: <a href="https://github.com/jiarong/VirSorter2#detailed-description-on-output-files">VirSorter2 outputs</a>.</p>
-
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<hr>
-<h1 id="MMSeqs2"><font color="gray">MMSeqs2</font><a class="anchor-link" href="#MMSeqs2">&#182;</a></h1>
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<p><code>mmseqs</code> predicts contig taxonomy by first comparing all 6-frame translated sequences within a contig to a reference database. Afterwards, it identifies the Lowest Common Ancestor (LCA) of the taxonomies associated with each coding DNA sequence (CDS).</p>
-
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<h3 id="How-to-run?">How to run?<a class="anchor-link" href="#How-to-run?">&#182;</a></h3>
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<h4 id="a.-Building-or-downloading-the-reference-database">a. Building or downloading the reference database<a class="anchor-link" href="#a.-Building-or-downloading-the-reference-database">&#182;</a></h4>
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<p>First, we have to select a reference database. You can find a list of available pre-processed databases here: <a href="https://github.com/soedinglab/mmseqs2/wiki#downloading-databases">MMSeqs2 databases</a>. The databases with "yes" in the "taxonomy" column are the relevant ones for this module. Below, we download the SwissProt database. This is a highly curated protein database. This ensures that reference sequences are accurate for comparison, however, as a downside, it may not be very sensitive because it contains fewer sequences.</p>
-
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[&nbsp;]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">!</span>mmseqs databases UniProtKB/Swiss-Prot taxdb/swissprot tmp
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-</div>
 <div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
 </div><div class="inner_cell">
 <div class="text_cell_render border-box-sizing rendered_html">
 <div class="alert alert-block alert-info">
-<b>Note</b>: 
+<b>Note:</b> 
 
-The available pre-processed databases may not always suit your needs. If you wish to create a custom MMSeqs2 taxonomy database, instructions are provided here: <a href="https://github.com/soedinglab/MMseqs2/wiki#creating-a-seqtaxdb">Creating a seqTaxDB</a>.
+For a multi-sample dataset, consider using the <code>--samples_file</code>. This will automatically organize the outputs to different folders per sample. Alternatively, you can also modify the code below and make use of a loop.
 </div>
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<h4 id="b.-Build-a-query-database">b. Build a query database<a class="anchor-link" href="#b.-Build-a-query-database">&#182;</a></h4>
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<p>Next, we create a query database which is basically just an indexed form of your contigs.</p>
-
 </div>
 </div>
 </div>
@@ -13640,265 +13486,15 @@ The available pre-processed databases may not always suit your needs. If you wis
 <div class="prompt input_prompt">In&nbsp;[&nbsp;]:</div>
 <div class="inner_cell">
     <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">!</span>mmseqs createdb <span class="err">\</span>
-    <span class="n">assembly_contigs</span><span class="o">.</span><span class="n">fa</span> \
-    <span class="n">querydb</span><span class="o">/</span><span class="n">assembly_contigs_idx</span>
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<h4 id="c.-Assign-taxonomies-to-the-query-sequences">c. Assign taxonomies to the query sequences<a class="anchor-link" href="#c.-Assign-taxonomies-to-the-query-sequences">&#182;</a></h4>
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<p>This step runs the core mmseqs taxonomy assignment algorithm briefly mentioned above.</p>
-
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[&nbsp;]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">!</span>mmseqs taxonomy <span class="err">\</span>
-    <span class="n">querydb</span><span class="o">/</span><span class="n">assembly_contigs_idx</span> \
-    <span class="n">taxdb</span><span class="o">/</span><span class="n">swissprot</span> \
-    <span class="n">mmseqs_tax_res</span><span class="o">/</span><span class="n">mmseqs_tax_result</span> \
-    <span class="n">mmseqs_tax_res</span><span class="o">/</span><span class="n">tmp</span> \
-    <span class="o">--</span><span class="n">tax</span><span class="o">-</span><span class="n">lineage</span> <span class="mi">1</span> \
-    <span class="o">--</span><span class="n">majority</span> <span class="mf">0.4</span> \
-    <span class="o">--</span><span class="n">vote</span><span class="o">-</span><span class="n">mode</span> <span class="mi">1</span> \
-    <span class="o">--</span><span class="n">lca</span><span class="o">-</span><span class="n">mode</span> <span class="mi">3</span> \
-    <span class="o">--</span><span class="n">orf</span><span class="o">-</span><span class="nb">filter</span> <span class="mi">0</span>
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<h4 id="d.-Filter-contigs-by-taxonomy-assignment-(optional)">d. Filter contigs by taxonomy assignment (optional)<a class="anchor-link" href="#d.-Filter-contigs-by-taxonomy-assignment-(optional)">&#182;</a></h4>
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<p>If you are interested in studying a specific taxonomic group, you can use the <code>mmseqs filtertaxdb</code> command. For example, if you want to retrieve the viral contigs only, you can use the command below. The number specified in the <code>--taxon-list</code> argument corresponds to the NCBI taxon ID for viruses. You can search for taxonomy IDs in the <a href="https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi">NCBI taxonomy browser</a>.</p>
-
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[&nbsp;]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">!</span>mmseqs filtertaxdb <span class="err">\</span>
-    <span class="n">taxdb</span><span class="o">/</span><span class="n">swissprot</span> \
-    <span class="n">mmseqs_tax_res</span><span class="o">/</span><span class="n">mmseqs_tax_result</span> \
-    <span class="n">mmseqs_tax_res</span><span class="o">/</span><span class="n">mmseqs_tax_result_virus</span> \
-    <span class="o">--</span><span class="n">taxon</span><span class="o">-</span><span class="nb">list</span> <span class="mi">10239</span>
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<h4 id="e.-Generate-reports">e. Generate reports<a class="anchor-link" href="#e.-Generate-reports">&#182;</a></h4>
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<p>We can summarize the taxonomy assignment process above into a TSV file and Krona chart.</p>
-
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[&nbsp;]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="c1"># Create a TSV file of the contig taxonomy assignments</span>
-<span class="o">!</span>mmseqs createtsv <span class="err">\</span>
-    <span class="n">querydb</span><span class="o">/</span><span class="n">assembly_contigs_idx</span> \
-    <span class="n">mmseqs_tax_res</span><span class="o">/</span><span class="n">mmseqs_tax_result</span> \
-    <span class="n">mmseqs_tax_res</span><span class="o">/</span><span class="n">mmseqs_tax_result</span><span class="o">.</span><span class="n">tsv</span>
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[&nbsp;]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="c1"># Create a Krona chart</span>
-<span class="o">!</span>mmseqs taxonomyreport <span class="err">\</span>
-    <span class="n">taxdb</span><span class="o">/</span><span class="n">swissprot</span> \
-    <span class="n">mmseqs_tax_res</span><span class="o">/</span><span class="n">mmseqs_tax_result</span> \
-    <span class="n">mmseqs_tax_res</span><span class="o">/</span><span class="n">mmseqs_tax_result_report</span><span class="o">.</span><span class="n">html</span> \
-    <span class="o">--</span><span class="n">report</span><span class="o">-</span><span class="n">mode</span> <span class="mi">1</span>
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<h3 id="What-are-its-outputs?">What are its outputs?<a class="anchor-link" href="#What-are-its-outputs?">&#182;</a></h3>
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<p>As discussed above, the final outputs are:</p>
-<ol>
-<li><code>mmseqs_tax_result.tsv</code> - TSV file displaying the taxonomic annotation of each FASTA entry (i.e. contig). More details about the format of the output TSV is discussed <a href="https://github.com/soedinglab/MMseqs2/wiki#taxonomy-output-and-tsv">here</a>.</li>
-<li><code>mmseqs_tax_result_report.html</code> - Krona chart to visualize taxonomic annotations. Note that it does not represent the relative abundances of these taxonomic groups, only the proportion of contigs with specific taxonomic assignments.</li>
-</ol>
-<p>Depending on your objectives, you may want to further explore sequences coming from specific taxonomic groups. To do so, create a TSV file (<code>mmseqs createtsv</code>) for the filtered contigs in step E above. This will give you a list of contigs with taxonomy assignments of your group of interest. Afterwards, use the custom Python script below to filter your query contigs. We assume that the output TSV file of the filtered data is named <code>filt_tsv.tsv</code>.</p>
-
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[&nbsp;]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span><span class="o">!</span>./filter_fasta_by_id.py <span class="err">\</span>
-    <span class="o">--</span><span class="n">filt_file_in</span> <span class="n">filt_tsv</span><span class="o">.</span><span class="n">tsv</span> \
-    <span class="o">--</span><span class="n">fasta_in</span> <span class="n">assembly_contigs</span><span class="o">.</span><span class="n">fa</span> \
-    <span class="o">--</span><span class="n">filt_file_type</span> <span class="n">GENERAL</span> \
-    <span class="o">--</span><span class="n">fasta_out</span> <span class="n">filt_assembly_contigs</span><span class="o">.</span><span class="n">fa</span>
-</pre></div>
-
-    </div>
-</div>
-</div>
-
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<p>The custom script will produce a filtered FASTA file (<code>filt_assembly_contigs.fa</code>) containing only contigs with hits to your taxonomy of interest.</p>
-
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<hr>
-<h1 id="Bin-Annotation-Tool-(BAT)"><font color="gray">Bin Annotation Tool (BAT)</font><a class="anchor-link" href="#Bin-Annotation-Tool-(BAT)">&#182;</a></h1>
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<p>"... Bin Annotation Tool (BAT) are pipelines for the taxonomic classification of ... metagenome assembled genomes (MAGs / bins) of both known and (highly) unknown microorganisms, as generated by contemporary metagenomics studies. The core algorithm of both programs involves gene calling, mapping of predicted ORFs against a protein database, and voting-based classification of the entire contig / MAG based on classification of the individual ORFs."</p>
-<p>Source: <a href="https://github.com/MGXlab/CAT_pack">CAT/BAT</a></p>
-
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<h3 id="How-to-run?">How to run?<a class="anchor-link" href="#How-to-run?">&#182;</a></h3>
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<p>BAT requires heavy resource to run due to its large database. Besides accessing HPCs, you can also run BAT through the <a href="https://usegalaxy.eu/">EU Galaxy Webserver</a>.</p>
-
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<ol>
-<li>On the tool search panel (left side), search for "CAT bins".</li>
-</ol>
-<p><img src="images/tool_search.png" alt="tools"></p>
-
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<ol>
-<li>Assuming you have already uploaded your bin FASTA file, select it under the "metagenome assembled genomes (MAGs/bins)" section. Moreover, choose the latest database version under the "Use a built-in CAT database".</li>
-</ol>
-<p><img src="images/inputs.png" alt="inputs"></p>
-
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<ol>
-<li>You can leave the other parameters as default and execute by clicking "Run Tool".</li>
-</ol>
-
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<h3 id="What-are-its-outputs?">What are its outputs?<a class="anchor-link" href="#What-are-its-outputs?">&#182;</a></h3>
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing text_cell rendered"><div class="prompt input_prompt">
-</div><div class="inner_cell">
-<div class="text_cell_render border-box-sizing rendered_html">
-<p>There are several outputs, but the most relevant will likely be <code>BAT.bin2classification.txt</code> which will display the inferred lineage of the bin (using NCBI taxonomy ID) and the confidence score for the assignment at each taxonomic level.</p>
-
-</div>
-</div>
-</div>
-<div class="cell border-box-sizing code_cell rendered">
-<div class="input">
-<div class="prompt input_prompt">In&nbsp;[&nbsp;]:</div>
-<div class="inner_cell">
-    <div class="input_area">
-<div class=" highlight hl-ipython3"><pre><span></span> 
+<div class=" highlight hl-ipython3"><pre><span></span><span class="o">!</span>docker run --rm -v <span class="sb">`</span><span class="nb">pwd</span><span class="sb">`</span>:<span class="sb">`</span><span class="nb">pwd</span><span class="sb">`</span> trinityrnaseq/trinityrnaseq <span class="err">\</span>
+<span class="o">/</span><span class="n">usr</span><span class="o">/</span><span class="n">local</span><span class="o">/</span><span class="nb">bin</span><span class="o">/</span><span class="n">util</span><span class="o">/</span><span class="n">align_and_estimate_abundance</span><span class="o">.</span><span class="n">pl</span> \
+    <span class="o">--</span><span class="n">transcripts</span> <span class="err">`</span><span class="n">pwd</span><span class="err">`</span><span class="o">/</span><span class="mi">4</span><span class="o">-</span><span class="n">assembly_trinity</span><span class="o">/</span><span class="n">a_minutum_ref_assembly</span><span class="o">.</span><span class="n">fasta</span> \
+    <span class="o">--</span><span class="n">seqType</span> <span class="n">fq</span> \
+    <span class="o">--</span><span class="n">left</span> <span class="s2">&quot;$(pwd)/S1_forward.fastq.gz&quot;</span> \
+    <span class="o">--</span><span class="n">right</span> <span class="s2">&quot;$(pwd)/S2_forward.fastq.gz&quot;</span> \
+    <span class="o">--</span><span class="n">est_method</span> <span class="n">RSEM</span> \
+    <span class="o">--</span><span class="n">aln_method</span> <span class="n">bowtie2</span> \
+    <span class="o">--</span><span class="n">output_dir</span> <span class="s2">&quot;$(pwd)/rsem_out&quot;</span> <span class="mi">2</span><span class="o">&gt;&amp;</span><span class="mi">1</span> <span class="o">|</span> <span class="n">tee</span> <span class="o">-</span><span class="n">a</span> <span class="s2">&quot;$(pwd)/out.log&quot;</span>
 </pre></div>
 
     </div>
